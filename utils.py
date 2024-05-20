@@ -1,6 +1,7 @@
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
+import random
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
@@ -8,110 +9,231 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.ensemble import VotingClassifier
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.metrics import classification_report
-from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, cross_val_score, cross_validate
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import (
+    RandomizedSearchCV,
+    StratifiedKFold,
+    cross_val_score,
+    cross_validate,
+)
 
 from sklearn.manifold import TSNE
-import warnings 
+import warnings
+
 warnings.filterwarnings("ignore")
 NUM_TRIALS = 10000
 SEED = 42420
 scv = StratifiedKFold(n_splits=5)
 
-times = np.array(['2021-11-11T03:19:49.024000000', '2021-11-16T03:20:11.024000000',
-    '2021-11-21T03:20:29.024000000', '2021-11-26T03:20:51.024000000',
-    '2021-12-01T03:21:09.024000000', '2021-12-06T03:21:21.024000000',
-    '2021-12-11T03:21:29.024000000', '2021-12-16T03:21:41.024000000',
-    '2021-12-21T03:21:39.024000000', '2021-12-26T03:21:41.024000000',
-    '2021-12-31T03:21:29.024000000', '2022-01-05T03:21:31.024000000',
-    '2022-01-10T03:21:09.024000000', '2022-01-20T03:20:39.024000000',
-    '2022-01-30T03:19:49.024000000', '2022-02-04T03:19:31.024000000',
-    '2022-02-09T03:18:59.024000000', '2022-02-14T03:18:31.024000000',
-    '2022-02-19T03:17:49.024000000', '2022-02-24T03:17:31.024000000',
-    '2022-03-01T03:16:49.024000000', '2022-03-06T03:16:21.024000000',
-    '2022-03-11T03:15:39.024000000', '2022-03-16T03:15:41.024000000',
-    '2022-03-21T03:15:39.024000000', '2022-03-26T03:15:41.024000000',
-    '2022-03-31T03:15:39.024000000', '2022-04-05T03:15:41.024000000',
-    '2022-04-10T03:15:39.024000000', '2022-04-15T03:15:41.024000000',
-    '2022-04-20T03:15:39.024000000', '2022-04-25T03:15:41.024000000',
-    '2022-04-30T03:15:29.024000000', '2022-05-10T03:15:39.024000000',
-    '2022-05-15T03:15:41.024000000', '2022-05-20T03:15:39.024000000',
-    '2022-05-25T03:15:51.024000000', '2022-05-30T03:15:39.024000000',
-    '2022-06-04T03:15:51.024000000', '2022-06-09T03:15:39.024000000',
-    '2022-06-14T03:15:51.024000000', '2022-06-19T03:15:19.024000000',
-    '2022-06-24T03:15:51.024000000', '2022-06-29T03:15:29.024000000',
-    '2022-07-04T03:15:31.024000000', '2022-07-09T03:15:29.024000000',
-    '2022-07-14T03:15:51.024000000', '2022-07-19T03:15:29.024000000',
-    '2022-07-24T03:15:31.024000000', '2022-07-29T03:15:29.024000000',
-    '2022-08-03T03:15:31.024000000', '2022-08-08T03:15:19.024000000',
-    '2022-08-13T03:15:31.024000000', '2022-08-18T03:15:19.024000000',
-    '2022-08-23T03:15:31.024000000'])
-times = [t.split('T')[0][:7] for t in times]
 
+def prep_s2_data(data):
+    """
+    Preprocess Sentinel-2 satellite data to compute vegetation indices.
 
-def prep_s2_data(data, time=times):
-    L=0.5
+    This function calculates NDVI, SAVI, and EVI for each time point and sample in the input data.
+    It returns the processed data reshaped to the desired format.
+
+    Parameters:
+    - data: A numpy array of shape (samples, bands, time_points). Each sample contains the following bands:
+      - Red (index 0)
+      - Green (index 1)
+      - Blue (index 2)
+      - NIR (index 3)
+    - time: A list or array of time points corresponding to the time dimension of the data.
+
+    Returns:
+    - A numpy array of shape (samples, 3, 10) containing the computed NDVI, SAVI, and EVI values for each sample.
+    """
+    times = np.array(
+        [
+            "2021-11-11T03:19:49.024000000",
+            "2021-11-16T03:20:11.024000000",
+            "2021-11-21T03:20:29.024000000",
+            "2021-11-26T03:20:51.024000000",
+            "2021-12-01T03:21:09.024000000",
+            "2021-12-06T03:21:21.024000000",
+            "2021-12-11T03:21:29.024000000",
+            "2021-12-16T03:21:41.024000000",
+            "2021-12-21T03:21:39.024000000",
+            "2021-12-26T03:21:41.024000000",
+            "2021-12-31T03:21:29.024000000",
+            "2022-01-05T03:21:31.024000000",
+            "2022-01-10T03:21:09.024000000",
+            "2022-01-20T03:20:39.024000000",
+            "2022-01-30T03:19:49.024000000",
+            "2022-02-04T03:19:31.024000000",
+            "2022-02-09T03:18:59.024000000",
+            "2022-02-14T03:18:31.024000000",
+            "2022-02-19T03:17:49.024000000",
+            "2022-02-24T03:17:31.024000000",
+            "2022-03-01T03:16:49.024000000",
+            "2022-03-06T03:16:21.024000000",
+            "2022-03-11T03:15:39.024000000",
+            "2022-03-16T03:15:41.024000000",
+            "2022-03-21T03:15:39.024000000",
+            "2022-03-26T03:15:41.024000000",
+            "2022-03-31T03:15:39.024000000",
+            "2022-04-05T03:15:41.024000000",
+            "2022-04-10T03:15:39.024000000",
+            "2022-04-15T03:15:41.024000000",
+            "2022-04-20T03:15:39.024000000",
+            "2022-04-25T03:15:41.024000000",
+            "2022-04-30T03:15:29.024000000",
+            "2022-05-10T03:15:39.024000000",
+            "2022-05-15T03:15:41.024000000",
+            "2022-05-20T03:15:39.024000000",
+            "2022-05-25T03:15:51.024000000",
+            "2022-05-30T03:15:39.024000000",
+            "2022-06-04T03:15:51.024000000",
+            "2022-06-09T03:15:39.024000000",
+            "2022-06-14T03:15:51.024000000",
+            "2022-06-19T03:15:19.024000000",
+            "2022-06-24T03:15:51.024000000",
+            "2022-06-29T03:15:29.024000000",
+            "2022-07-04T03:15:31.024000000",
+            "2022-07-09T03:15:29.024000000",
+            "2022-07-14T03:15:51.024000000",
+            "2022-07-19T03:15:29.024000000",
+            "2022-07-24T03:15:31.024000000",
+            "2022-07-29T03:15:29.024000000",
+            "2022-08-03T03:15:31.024000000",
+            "2022-08-08T03:15:19.024000000",
+            "2022-08-13T03:15:31.024000000",
+            "2022-08-18T03:15:19.024000000",
+            "2022-08-23T03:15:31.024000000",
+        ]
+    )
+    time = [t.split("T")[0][:7] for t in times]
+    L = 0.5
     prep_data = []
     for d in range(data.shape[0]):
         ds = pd.DataFrame()
-        ds['time'] = time
-        ds['red'] = data[d,0,:]
-        ds['green'] = data[d,1,:]
-        ds['blue'] = data[d,2,:]
-        ds['nir'] = data[d,3,:]
-        ds['ndvi'] = (ds.nir-ds.red)/(ds.nir+ds.red)
-        ds['savi'] = (1+L)*(ds.nir-ds.red)/(ds.nir+ds.red+L)
-        ds['evi'] = 2.5*((ds.nir-ds.red)/(ds.nir+6*ds.red-7.5*ds.blue)+1)
-        sample = ds.groupby('time').mean(numeric_only=True).reset_index()[['ndvi','savi','evi']].to_numpy().reshape(3,10) #CHANGE FEATURES HERE 
+        ds["time"] = time
+        ds["red"] = data[d, 0, :]
+        ds["green"] = data[d, 1, :]
+        ds["blue"] = data[d, 2, :]
+        ds["nir"] = data[d, 3, :]
+        ds["ndvi"] = (ds.nir - ds.red) / (ds.nir + ds.red)
+        ds["savi"] = (1 + L) * (ds.nir - ds.red) / (ds.nir + ds.red + L)
+        ds["evi"] = 2.5 * (
+            (ds.nir - ds.red) / (ds.nir + 6 * ds.red - 7.5 * ds.blue) + 1
+        )
+        sample = (
+            ds.groupby("time")
+            .mean(numeric_only=True)
+            .reset_index()[["ndvi", "savi", "evi"]]
+            .to_numpy()
+            .reshape(3, 10)
+        )  # CHANGE FEATURES HERE
         prep_data.append(sample)
     return np.array(prep_data)
 
+
 def prep_s1_data(data):
-    vv = data[:,0,:]
-    vh = data[:,1,:]
-    q = vh/vv
-    n = q*(q+3)
-    d = (q+1)**2
-    rvi = n/d #CALCULATION OF Radar Vegetation Index
-    ndvi_sar = (vh-vv)/(vh+vv)
+    """
+    Preprocess Sentinel-1 SAR data to compute Radar Vegetation Index (RVI) and NDVI-SAR.
+
+    This function calculates RVI and NDVI-SAR for each sample in the input data. It returns the original
+    data with the additional computed indices.
+
+    Parameters:
+    - data: A numpy array of shape (samples, bands, time_points). Each sample contains the following bands:
+      - VV (index 0)
+      - VH (index 1)
+
+    Returns:
+    - A numpy array with the original data and the computed RVI and NDVI-SAR values added as additional bands.
+    """
+    vv = data[:, 0, :]
+    vh = data[:, 1, :]
+    q = vh / vv
+    n = q * (q + 3)
+    d = (q + 1) ** 2
+    rvi = n / d  # CALCULATION OF Radar Vegetation Index
+    ndvi_sar = (vh - vv) / (vh + vv)
     if len(data.shape) == 3:
-        rvi = rvi.reshape(data.shape[0],1,data.shape[2])
-        ndvi_sar = ndvi_sar.reshape(data.shape[0],1,data.shape[2])
+        rvi = rvi.reshape(data.shape[0], 1, data.shape[2])
+        ndvi_sar = ndvi_sar.reshape(data.shape[0], 1, data.shape[2])
     else:
-        rvi = rvi.reshape(data.shape[0],1)
-        ndvi_sar = ndvi_sar.reshape(data.shape[0],1)
+        rvi = rvi.reshape(data.shape[0], 1)
+        ndvi_sar = ndvi_sar.reshape(data.shape[0], 1)
     rvi = np.nan_to_num(rvi, nan=0)
-    new_data = np.concatenate((data,rvi,ndvi_sar),axis=1).copy()
+    new_data = np.concatenate((data, rvi, ndvi_sar), axis=1).copy()
     return new_data
 
 
+def create_col_names(
+    features_sar=["VV", "VH", "RVI", "NDVI_SAR"],
+    features_o=["ndvi", "savi", "evi"],
+    timesteps=[52, 10],
+):
+    """
+    Create column names for SAR and optical features over specified timesteps.
 
-def create_col_names(features_sar=['VV','VH','RVI','NDVI_SAR'],features_o=['ndvi','savi','evi'],timesteps=[52,10]):
-    cols_sar = [f'{feat}_{t}' for feat in features_sar for t in range(0,timesteps[0])]
-    cols_o = [f'{feat}_{t}' for feat in features_o for t in range(0,timesteps[1])]
-    cols = cols_sar+cols_o
-    dicts = {t:c for t,c in zip(range(0,len(features_sar)*timesteps[0]+len(features_o)*timesteps[1]),cols)}
+    This function generates a dictionary mapping column indices to their corresponding
+    feature names, based on the given SAR and optical feature lists and their respective
+    timesteps.
+
+    Parameters:
+    - features_sar (list): List of SAR feature names.
+    - features_o (list): List of optical feature names.
+    - timesteps (list): A list containing the number of timesteps for SAR and optical
+                        features respectively.
+
+    Returns:
+    - dict: A dictionary where keys are column indices and values are the feature names.
+
+    Example:
+    >>> create_col_names()
+    {0: 'VV_0', 1: 'VV_1', 2: 'VV_2', ..., 51: 'NDVI_SAR_51', 52: 'ndvi_0', ..., 81: 'evi_9'}
+    """
+    cols_sar = [f"{feat}_{t}" for feat in features_sar for t in range(0, timesteps[0])]
+    cols_o = [f"{feat}_{t}" for feat in features_o for t in range(0, timesteps[1])]
+    cols = cols_sar + cols_o
+    dicts = {
+        t: c
+        for t, c in zip(
+            range(0, len(features_sar) * timesteps[0] + len(features_o) * timesteps[1]),
+            cols,
+        )
+    }
     return dicts
-    
-def proc_pipeline(s1data,s2data):
+
+
+def proc_pipeline(s1data, s2data):
+    """Preprocesses data for a pipeline.
+
+    Args:
+    s1data (array-like or None): The input data for the first part of the pipeline.
+    s2data (array-like or None): The input data for the second part of the pipeline.
+
+    Returns:
+    pandas.DataFrame: A DataFrame containing the preprocessed data from both s1data and s2data, if both are provided. If only s1data is provided, returns a DataFrame containing the preprocessed data from s1data. If only s2data is provided, returns a DataFrame containing the preprocessed data from s2data. If both s1data and s2data are None, returns None.
+    """
     if s1data is not None:
-        data_s1 = s1data[:,:,:52].copy() #CHANGE HERE FOR TIMESTEPS
+        data_s1 = s1data[:, :, :52].copy()  # CHANGE HERE FOR TIMESTEPS
         data_s1 = prep_s1_data(data_s1)
-        data_s1 = pd.DataFrame(data_s1.reshape(data_s1.shape[0],data_s1.shape[1]*data_s1.shape[2]))#.dropna(axis=1)
+        data_s1 = pd.DataFrame(
+            data_s1.reshape(data_s1.shape[0], data_s1.shape[1] * data_s1.shape[2])
+        )  # .dropna(axis=1)
         if s2data is not None:
             data_s2 = prep_s2_data(s2data)
-            data_s2 = pd.DataFrame(data_s2.reshape(data_s2.shape[0],data_s2.shape[1]*data_s2.shape[2]))
-            complete_df = pd.concat([data_s1,data_s2],axis=1, ignore_index=True)
+            data_s2 = pd.DataFrame(
+                data_s2.reshape(data_s2.shape[0], data_s2.shape[1] * data_s2.shape[2])
+            )
+            complete_df = pd.concat([data_s1, data_s2], axis=1, ignore_index=True)
             return complete_df
         else:
             return data_s1
     else:
         data_s2 = prep_s2_data(s2data)
-        data_s2 = pd.DataFrame(data_s2.reshape(data_s2.shape[0],data_s2.shape[1]*data_s2.shape[2]))
+        data_s2 = pd.DataFrame(
+            data_s2.reshape(data_s2.shape[0], data_s2.shape[1] * data_s2.shape[2])
+        )
         return data_s2
-    
 
-def correlation_plot(dataframe):
+
+def correlation_plot(dataframe, run=None):
     """
     Generates a correlation heatmap plot using Seaborn.
 
@@ -121,78 +243,185 @@ def correlation_plot(dataframe):
     Returns:
     - None (displays the plot).
     """
-    corr_matrix = dataframe.corr()
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(corr_matrix, annot=True, fmt='.2f', linewidths=0.5, annot_kws={"size": 6})
-    plt.title('Correlation Heatmap')
-    plt.show()
-    #TODO: ADD WANDB ARTIFACT SAVE
+    import wandb
 
-def make_violinplot(df):
+    corr_matrix = dataframe.corr()
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    sns.heatmap(
+        corr_matrix, annot=True, fmt=".2f", linewidths=0.5, annot_kws={"size": 6}, ax=ax
+    )
+    ax.set_title("Correlation Heatmap")
+
+    # Log the plot directly to W&B
+    run.log({"correlation_heatmap": wandb.Image(fig)})
+
+
+def make_violinplot(df, run=None):
+    """
+    Generate a violin plot for each feature in the DataFrame and log it to Weights & Biases.
+
+    This function creates a violin plot for each feature variable grouped by the target
+    class and logs the plot to a Weights & Biases run instance. Violin plots are useful
+    for visualizing the distribution of the data across different categories.
+
+    Parameters:
+    - df: pandas DataFrame containing the feature variables and a 'Target' column.
+          The 'Target' column should have the classes to group by.
+    - run: Weights & Biases run instance. If provided, the plot will be logged to this
+           run. Defaults to None.
+
+    Returns:
+    - None
+    """
+    import wandb
+
     traces = []
 
     for feature_name, feature_values in df.items():
-        trace = go.Violin(y=feature_values, x=df['Target'], name=feature_name, box_visible=True, meanline_visible=True)
+        trace = go.Violin(
+            y=feature_values,
+            x=df["Target"],
+            name=feature_name,
+            box_visible=True,
+            meanline_visible=True,
+        )
         traces.append(trace)
 
     fig = go.Figure(data=traces)
-    fig.update_layout(title='Violin Plot of Feature Variables by Target Class', yaxis_title='Feature Value', xaxis_title='Rice or Non-Rice')
-    fig.show()
-    #TODO: ADD WANDB ARTIFACT SAVE
-    return fig
+    fig.update_layout(
+        title="Violin Plot of Feature Variables by Target Class",
+        yaxis_title="Feature Value",
+        xaxis_title="Rice or Non-Rice",
+    )
+    # fig.show()
+    run.log({"violin_plot": wandb.Image(fig)})
 
-def tsne_plot(dataframe, target_column):
+
+def tsne_plot(dataframe, target_column, run):
     """
     Generates a t-SNE plot using Plotly with hover information to visualize high-dimensional data.
 
     Parameters:
     - dataframe: pandas DataFrame containing numeric columns.
     - target_column: Name of the target column in the DataFrame.
-
-    Returns:
-    - fig: Plotly Figure object containing the t-SNE plot with hover information.
     """
+    import wandb
+
     X = dataframe.drop(columns=[target_column])
     y = dataframe[target_column]
 
     tsne = TSNE(n_components=2, random_state=42)
     X_tsne = tsne.fit_transform(X)
-    hover_text = ['Index: {}'.format(index) for index in dataframe.index]
-    fig = px.scatter(x=X_tsne[:, 0], y=X_tsne[:, 1], color=y, labels={'x': 't-SNE Component 1', 'y': 't-SNE Component 2'}, color_continuous_scale='viridis', title='t-SNE Plot', hover_name=hover_text)
+    hover_text = ["Index: {}".format(index) for index in dataframe.index]
+    fig = px.scatter(
+        x=X_tsne[:, 0],
+        y=X_tsne[:, 1],
+        color=y,
+        labels={"x": "t-SNE Component 1", "y": "t-SNE Component 2"},
+        color_continuous_scale="viridis",
+        title="t-SNE Plot",
+        hover_name=hover_text,
+    )
     fig.update_coloraxes(colorbar_title=target_column)
-    #TODO: ADD WANDB ARTIFACT SAVE
-    return fig, X_tsne
+    fig.update_layout(showlegend=False)
+    run.log({"tsne_plot": wandb.Image(fig)})
 
 
 def rank_seeds(clf, X_train, y_train, topk=10):
+    """
+    Rank random seeds based on cross-validation accuracy for a given classifier.
+
+    This function performs multiple cross-validation runs using different random seeds
+    and ranks the seeds based on the average cross-validation accuracy. The top-k seeds
+    with the lowest accuracy are returned.
+
+    Parameters:
+    - clf: The classifier to be evaluated. It must implement the 'fit' and 'predict' methods.
+    - X_train: Training data features as a pandas DataFrame or numpy array.
+    - y_train: Training data labels as a pandas Series or numpy array.
+    - topk: The number of top seeds to return. Defaults to 10.
+
+    Returns:
+    - seeds: A list of the top-k seeds with the lowest cross-validation accuracy scores.
+    """
     sd = {}
-    for seed in tqdm(range(0,NUM_TRIALS)):
+    for seed in tqdm(range(0, NUM_TRIALS)):
         scv = StratifiedKFold(n_splits=5, random_state=seed, shuffle=True)
-        score = cross_val_score(clf, X_train, y_train, cv=scv.split(X_train, y_train), scoring='accuracy').mean()
-        sd.update({seed:score})
-    seeds = pd.DataFrame(list(sd.items()), columns=['Seed', 'Score']).sort_values('Score',ascending=True).index[0:topk].values.tolist()
+        score = cross_val_score(
+            clf, X_train, y_train, cv=scv.split(X_train, y_train), scoring="accuracy"
+        ).mean()
+        sd.update({seed: score})
+    seeds = (
+        pd.DataFrame(list(sd.items()), columns=["Seed", "Score"])
+        .sort_values("Score", ascending=True)
+        .index[0:topk]
+        .values.tolist()
+    )
     return seeds
 
+
 def score_clf(clf, X_train, y_train, seeds2):
+    """
+    Evaluate a classifier using multiple random seeds for cross-validation.
+
+    This function performs cross-validation using different random seeds to evaluate
+    the performance of a given classifier. It returns the mean accuracy score and
+    the standard deviation of the accuracy scores.
+
+    Parameters:
+    - clf: The classifier to be evaluated. It must implement the 'fit' and 'predict' methods.
+    - X_train: Training data features as a pandas DataFrame or numpy array.
+    - y_train: Training data labels as a pandas Series or numpy array.
+    - seeds2: A list of random seeds to be used for cross-validation.
+
+    Returns:
+    - A dictionary containing:
+        - "score": The mean accuracy score across all seeds.
+        - "sd": The standard deviation of the accuracy scores.
+    """
     scores = []
     for seed in seeds2:
         scv = StratifiedKFold(n_splits=5, random_state=seed, shuffle=True)
-        score = cross_val_score(clf, X_train, y_train, cv=scv.split(X_train, y_train), scoring='accuracy').mean()
+        score = cross_val_score(
+            clf, X_train, y_train, cv=scv.split(X_train, y_train), scoring="accuracy"
+        ).mean()
         scores.append(score)
-    return {'score':np.mean(scores),'sd':np.std(scores)}
+    return {"score": np.mean(scores), "sd": np.std(scores)}
 
-def plot_fi(feat_imp):
+
+def plot_fi(feat_imp, run=None):
+    """
+    Generates and logs a feature importance plot using Plotly.
+
+    This function creates a bar plot showing the importance of features,
+    sorts the features by their importance scores in descending order,
+    and logs the plot to a Weights & Biases run instance if provided.
+
+    Parameters:
+    - feat_imp: Dictionary containing feature names as keys and their importance scores as values.
+    - run: Weights & Biases run instance. If provided, the plot will be logged to this run. Defaults to None.
+
+    Returns:
+    - None
+    """
+    import wandb
+
     sorted_features = sorted(feat_imp.items(), key=lambda x: x[1], reverse=True)
     features = [item[0] for item in sorted_features]
     importance_scores = [item[1] for item in sorted_features]
 
     fig = go.Figure(data=[go.Bar(x=features, y=importance_scores)])
-    fig.update_layout(title='Feature Importance', xaxis_title='Feature', yaxis_title='Importance Score')
+    fig.update_layout(
+        title="Feature Importance",
+        xaxis_title="Feature",
+        yaxis_title="Importance Score",
+    )
     fig.show()
-    #TODO: ADD WANDB ARTIFACT SAVE
+    run.log({"feature_importance": wandb.Image(fig)})
 
 
-#NESTED CV STRATEGY TO SCORE THE VALIDATION SET
+# NESTED CV STRATEGY TO SCORE THE VALIDATION SET
 def nested_cv(
     pipe,
     X,
@@ -203,91 +432,289 @@ def nested_cv(
     seed=42,
     metrics="accuracy",
 ):
+    """
+    Perform nested cross-validation to evaluate a pipeline with hyperparameter tuning.
+
+    This function performs nested cross-validation, combining an inner cross-validation
+    for hyperparameter tuning using RandomizedSearchCV and an outer cross-validation
+    for model evaluation. The best estimators and their scores are returned.
+
+    Parameters:
+    - pipe: The machine learning pipeline to be evaluated.
+    - X: Features dataset as a pandas DataFrame or numpy array.
+    - y: Target labels as a pandas Series or numpy array.
+    - grid: Dictionary with parameters names (str) as keys and lists of parameter
+            settings to try as values, used in RandomizedSearchCV.
+    - splits: Number of folds for cross-validation.
+    - iters: Number of parameter settings that are sampled in RandomizedSearchCV. Defaults to 5.
+    - seed: Random state seed for reproducibility. Defaults to 42.
+    - metrics: Scoring metric to evaluate the model performance. Defaults to 'accuracy'.
+
+    Returns:
+    - A dictionary containing:
+        - "model_params": List of best estimators from each outer fold.
+        - "accuracy": List of accuracy scores from each outer fold.
+    """
     inner_cv = StratifiedKFold(n_splits=splits, shuffle=True, random_state=seed)
     outer_cv = StratifiedKFold(n_splits=splits, shuffle=True, random_state=seed)
-    clf = RandomizedSearchCV(estimator=pipe, n_iter=iters, param_distributions=grid, cv=inner_cv, 
-                            scoring=metrics, n_jobs=-1, random_state=SEED)
-    scores = cross_validate(clf, X=X, y=y, cv=outer_cv, scoring=metrics, return_estimator=True)
+    clf = RandomizedSearchCV(
+        estimator=pipe,
+        n_iter=iters,
+        param_distributions=grid,
+        cv=inner_cv,
+        scoring=metrics,
+        n_jobs=-1,
+        random_state=seed,
+    )
+    scores = cross_validate(
+        clf, X=X, y=y, cv=outer_cv, scoring=metrics, return_estimator=True
+    )
     model_params = [e.best_estimator_ for e in scores["estimator"]]
     return {
         "model_params": model_params,
         "accuracy": scores["test_score"],
     }
 
-#FUNCTION TO RUN MULTIPLE NESTED CV TRIALS
-def run_cvs(pipe, X, y, grid, splits=10, iters=5, metrics = 'accuracy'):
+
+# FUNCTION TO RUN MULTIPLE NESTED CV TRIALS
+def run_cvs(pipe, X, y, grid, splits=10, iters=5, metrics="accuracy"):
+    """
+    Run multiple nested cross-validation trials and store results.
+
+    This function performs nested cross-validation multiple times, each with a different
+    random seed. It returns a DataFrame containing the results of each trial, including
+    the best model parameters and the accuracy scores.
+
+    Parameters:
+    - pipe: The machine learning pipeline to be evaluated.
+    - X: Features dataset as a pandas DataFrame or numpy array.
+    - y: Target labels as a pandas Series or numpy array.
+    - grid: Dictionary with parameter names (str) as keys and lists of parameter
+            settings to try as values, used in RandomizedSearchCV.
+    - splits: Number of folds for cross-validation. Defaults to 10.
+    - iters: Number of parameter settings sampled in RandomizedSearchCV. Defaults to 5.
+    - metrics: Scoring metric to evaluate the model performance. Defaults to 'accuracy'.
+
+    Returns:
+    - cv_results: DataFrame containing the results of each trial.
+    """
     cv_results = pd.DataFrame()
     row_res = {}
 
-    for i in tqdm(range(NUM_TRIALS)): #ITERATE THROUGH NUMBER OF TRIALS
+    for i in tqdm(range(NUM_TRIALS)):  # ITERATE THROUGH NUMBER OF TRIALS
         row_res["seed"] = i
-        cv_res = nested_cv(pipe, X, y, grid=grid, splits=splits, iters=iters, seed=i, metrics=metrics)
+        cv_res = nested_cv(
+            pipe, X, y, grid=grid, splits=splits, iters=iters, seed=i, metrics=metrics
+        )
         row_res.update(cv_res)
         temp_res = pd.DataFrame(row_res, columns=list(row_res.keys()))
         cv_results = pd.concat([cv_results, temp_res], axis=0, ignore_index=True)
         row_res = {}
     return cv_results
 
-#FUNCTION TO FIND THE WORST PERFORMING TRIAL OUT OF ALL THE TRIALS
+
+# FUNCTION TO FIND THE WORST PERFORMING TRIAL OUT OF ALL THE TRIALS
 def find_worst_seeds(res, topk=5):
+    """
+    Identify the worst performing seeds based on cross-validation results.
+
+    This function sorts the seeds by their average accuracy scores in ascending order
+    and returns the seeds corresponding to the lowest scores.
+
+    Parameters:
+    - res: DataFrame containing cross-validation results, including accuracy scores
+           and seeds.
+    - topk: Number of worst performing seeds to return. Defaults to 5.
+
+    Returns:
+    - seeds: List of the worst performing seeds.
+    """
     seeds = []
-    for seed in res.groupby('seed')['accuracy'].mean().sort_values(ascending=True).index[0:topk].values:
+    for seed in (
+        res.groupby("seed")["accuracy"]
+        .mean()
+        .sort_values(ascending=True)
+        .index[0:topk]
+        .values
+    ):
         seeds.append(seed)
     return seeds
 
-#MAKING VOTING CLASSIFIER USING A LIST OF MODELS
-def make_vc(search_list, name_list):
-    estimator_list = [(str(n), s) for n,s in zip(name_list, search_list)]
-    return VotingClassifier(estimators=estimator_list, voting='soft')
 
-def evaluate(clf, X_train, y_train, X_test, y_test):
+# MAKING VOTING CLASSIFIER USING A LIST OF MODELS
+def make_vc(search_list, name_list):
+    """
+    Create a voting classifier from a list of models.
+
+    This function takes a list of models and their corresponding names and creates a
+    VotingClassifier that uses soft voting.
+
+    Parameters:
+    - search_list: List of models to be included in the voting classifier.
+    - name_list: List of names corresponding to the models in search_list.
+
+    Returns:
+    - VotingClassifier: A VotingClassifier using soft voting.
+    """
+    estimator_list = [(str(n), s) for n, s in zip(name_list, search_list)]
+    return VotingClassifier(estimators=estimator_list, voting="soft")
+
+
+def evaluate(clf, combo, X_train, y_train, X_test, y_test, run=None):
+    """
+    Evaluate a classifier and log the confusion matrix to Weights & Biases.
+
+    This function fits a classifier on the training data, makes predictions on the test
+    data, and logs the confusion matrix to a Weights & Biases run.
+
+    Parameters:
+    - clf: The classifier to be evaluated.
+    - run: The Weights & Biases run instance.
+    - combo: Name of the model combination used (for logging purposes).
+    - X_train: Training data features.
+    - y_train: Training data labels.
+    - X_test: Test data features.
+    - y_test: Test data labels.
+
+    Returns:
+    - None
+    """
+    import wandb
+
     clf.fit(X_train, y_train)
     predictions = clf.predict(X_test)
-    print(classification_report(y_test,predictions))
+    cm = wandb.plot.confusion_matrix(
+        y_true=y_test, preds=predictions, class_names=["RICE", "NON-RICE"]
+    )
+    run.log({f"confusion_matrix_{combo}": cm})
+
 
 def predict_submission(clf, proc_pipe, X, y, use_s2=False):
-    testdfs1 = np.load('sar_data_test.npy')
+    """
+    Predict labels for submission using a fitted classifier.
+
+    This function loads test data, processes it using a provided pipeline, fits the
+    classifier on the training data, and predicts labels and probabilities for the
+    test data.
+
+    Parameters:
+    - clf: The classifier to be used for predictions.
+    - proc_pipe: Preprocessing pipeline to transform the test data.
+    - X: Training data features.
+    - y: Training data labels.
+    - use_s2: Boolean indicating whether to use additional data (sentinel2). Defaults to False.
+
+    Returns:
+    - submission_predictions: Predicted labels for the test data.
+    - submission_probs: Predicted probabilities for the test data.
+    """
+    testdfs1 = np.load("sar_data_test.npy")
     if use_s2:
-        testdfs2 = np.load('sentinel2_data_test.npy')
-        proc_testdf = proc_pipeline(testdfs1,testdfs2)
+        testdfs2 = np.load("sentinel2_data_test.npy")
+        proc_testdf = proc_pipeline(testdfs1, testdfs2)
     else:
-        proc_testdf = proc_pipeline(testdfs1,None)
+        proc_testdf = proc_pipeline(testdfs1, None)
     X_sub = proc_pipe.transform(proc_testdf)
-    clf.fit(X,y)
+    clf.fit(X, y)
     submission_predictions = clf.predict(X_sub)
     submission_probs = clf.predict_proba(X_sub)
     return submission_predictions, submission_probs
 
-#THE FUNCTION TO CREATE VOTING CLASSIFIER BASED ON PERFORMANCE ON WORST PERFORMING SEED
+
+# THE FUNCTION TO CREATE VOTING CLASSIFIER BASED ON PERFORMANCE ON WORST PERFORMING SEED
 def score_worst_seeds(clf, params, X, y, seeds, iters=100):
+    """
+    Create and evaluate a voting classifier based on the worst performing seeds.
+
+    This function performs nested cross-validation for each of the worst performing
+    seeds, creates a VotingClassifier using the best models from each trial, and
+    evaluates the ensemble.
+
+    Parameters:
+    - clf: The base classifier to be used in nested cross-validation.
+    - params: Dictionary with parameter names (str) as keys and lists of parameter
+              settings to try as values, used in RandomizedSearchCV.
+    - X: Training data features.
+    - y: Training data labels.
+    - seeds: List of worst performing seeds.
+    - iters: Number of parameter settings sampled in RandomizedSearchCV. Defaults to 100.
+
+    Returns:
+    - A tuple containing:
+        - VotingClassifier: An ensemble classifier using the models from the worst performing seeds.
+    """
     model_ls = []
     valid_scores = []
 
     for seed in tqdm(seeds):
-        cv_res = nested_cv(clf, X, y, grid=params, splits=5, iters=iters, seed=seed, metrics='f1_weighted')
-        cv_models = cv_res['model_params']
-        model = make_vc(cv_models, list([i for i in range(0,5)]))
-        score = cv_res['accuracy'].mean()
+        cv_res = nested_cv(
+            clf,
+            X,
+            y,
+            grid=params,
+            splits=5,
+            iters=iters,
+            seed=seed,
+            metrics="f1_weighted",
+        )
+        cv_models = cv_res["model_params"]
+        model = make_vc(cv_models, list([i for i in range(0, 5)]))
+        score = cv_res["accuracy"].mean()
         model_ls.append(model)
-        valid_scores.append(score*100)
+        valid_scores.append(score * 100)
 
-    print(f'The mean accuracy for the {len(seeds)} worst seeds is {np.mean(valid_scores)} and the std. dev. is {np.std(valid_scores)}')
-    return make_vc(model_ls, seeds)
+    print(
+        f"The mean accuracy for the {len(seeds)} worst seeds is {np.mean(valid_scores)} and the std. dev. is {np.std(valid_scores)}"
+    )
+    return make_vc(model_ls, seeds), np.mean(valid_scores), np.std(valid_scores)
 
-def make_ensemble(search_list, name_list):
-    vclf = make_vc(search_list, name_list)
-    return vclf
 
-#use itertools to make N>2 combinations of rf, svm, xgb, lgbm, mlp
-def score_combos(model_dict, N=2):
+# use itertools to make N>2 combinations of rf, svm, xgb, lgbm, mlp
+def score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, seeds, N=2):
+    """
+    Generate combinations of models, evaluate them, and log results to Weights & Biases.
+
+    Parameters:
+    - run: Weights & Biases run instance.
+    - model_dict: Dictionary with model names as keys and model instances as values.
+    - X_train: Training data features.
+    - y_train: Training data labels.
+    - seeds: List of random seeds for reproducibility.
+    - N: Number of models to combine. Default is 2.
+
+    Returns:
+    - None
+    """
     from itertools import combinations
-    combos = [list(combo) for combo in combinations(['rf', 'svm', 'xgb', 'lgbm', 'mlp'], N)]
-    for combo in combos:
-        search_combo = []
-        for c in combo:
-            search_combo.append(model_dict[c])
-        vclf = make_ensemble(search_combo, combo)
-        score_clf(vclf)
-        evaluate(vclf)
-    #TODO: ADD WANDB ARTIFACT SAVE
 
+    # Generate all combinations of models with length N
+    combos = [
+        list(combo) for combo in combinations(["rf", "svm", "xgb", "lgbm", "mlp"], N)
+    ]
+
+    for combo in combos:
+        search_combo = [model_dict[c] for c in combo]
+        vclf = make_vc(search_combo, combo)  # Create a voting classifier from the combo
+        score = score_clf(vclf, X_train, y_train, seeds)  # Score the voting classifier
+        run.log(
+            {f"score_combo_{'_'.join(combo)}": score}
+        )  # Log the score to Weights & Biases
+        evaluate(
+            vclf, run, "_".join(combo), X_train, y_train, X_test, y_test
+        )  # Evaluate and log confusion matrix
+
+
+def sample_dict(original_dict, sample_size):
+    """
+    Function to sample elements from lists in a dictionary.
+
+    :param original_dict: Dictionary with lists as values
+    :param sample_size: Number of elements to sample from each list
+    :return: New dictionary with sampled elements
+    """
+    new_dict = {}
+    for key, value_list in original_dict.items():
+        # Ensure sample size does not exceed the length of the list
+        sample_size = min(sample_size, len(value_list))
+        new_dict[key] = random.sample(value_list, sample_size)[0]
+    return new_dict
