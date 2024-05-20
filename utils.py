@@ -1,3 +1,6 @@
+import os
+import subprocess
+import time
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
@@ -21,8 +24,7 @@ from sklearn.manifold import TSNE
 import warnings
 
 warnings.filterwarnings("ignore")
-NUM_TRIALS = 10000
-SEED = 42420
+NUM_TRIALS = 1000
 scv = StratifiedKFold(n_splits=5)
 
 
@@ -254,7 +256,7 @@ def correlation_plot(dataframe, run=None):
     ax.set_title("Correlation Heatmap")
 
     # Log the plot directly to W&B
-    run.log({"correlation_heatmap": wandb.Image(fig)})
+    run.log({"correlation_heatmap": wandb.Plotly(fig)})
 
 
 def make_violinplot(df, run=None):
@@ -295,7 +297,7 @@ def make_violinplot(df, run=None):
         xaxis_title="Rice or Non-Rice",
     )
     # fig.show()
-    run.log({"violin_plot": wandb.Image(fig)})
+    run.log({"violin_plot": wandb.Plotly(fig)})
 
 
 def tsne_plot(dataframe, target_column, run):
@@ -325,7 +327,7 @@ def tsne_plot(dataframe, target_column, run):
     )
     fig.update_coloraxes(colorbar_title=target_column)
     fig.update_layout(showlegend=False)
-    run.log({"tsne_plot": wandb.Image(fig)})
+    run.log({"tsne_plot": wandb.Plotly(fig)})
 
 
 def rank_seeds(clf, X_train, y_train, topk=10):
@@ -387,7 +389,7 @@ def score_clf(clf, X_train, y_train, seeds2):
             clf, X_train, y_train, cv=scv.split(X_train, y_train), scoring="accuracy"
         ).mean()
         scores.append(score)
-    return {"score": np.mean(scores), "sd": np.std(scores)}
+    return np.mean(scores)
 
 
 def plot_fi(feat_imp, run=None):
@@ -417,8 +419,7 @@ def plot_fi(feat_imp, run=None):
         xaxis_title="Feature",
         yaxis_title="Importance Score",
     )
-    fig.show()
-    run.log({"feature_importance": wandb.Image(fig)})
+    run.log({"feature_importance": wandb.Plotly(fig)})
 
 
 # NESTED CV STRATEGY TO SCORE THE VALIDATION SET
@@ -666,7 +667,7 @@ def score_worst_seeds(clf, params, X, y, seeds, iters=100):
     print(
         f"The mean accuracy for the {len(seeds)} worst seeds is {np.mean(valid_scores)} and the std. dev. is {np.std(valid_scores)}"
     )
-    return make_vc(model_ls, seeds), np.mean(valid_scores), np.std(valid_scores)
+    return make_vc(model_ls, seeds), np.mean(valid_scores)
 
 
 # use itertools to make N>2 combinations of rf, svm, xgb, lgbm, mlp
@@ -688,9 +689,8 @@ def score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, seeds, N=2
     from itertools import combinations
 
     # Generate all combinations of models with length N
-    combos = [
-        list(combo) for combo in combinations(["rf", "svm", "xgb", "lgbm", "mlp"], N)
-    ]
+    model_list = list(model_dict.values())
+    combos = [list(combo) for combo in combinations(model_list, N)]
 
     for combo in combos:
         search_combo = [model_dict[c] for c in combo]
@@ -700,7 +700,7 @@ def score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, seeds, N=2
             {f"score_combo_{'_'.join(combo)}": score}
         )  # Log the score to Weights & Biases
         evaluate(
-            vclf, run, "_".join(combo), X_train, y_train, X_test, y_test
+            vclf, "_".join(combo), X_train, y_train, X_test, y_test, run
         )  # Evaluate and log confusion matrix
 
 
@@ -718,3 +718,14 @@ def sample_dict(original_dict, sample_size):
         sample_size = min(sample_size, len(value_list))
         new_dict[key] = random.sample(value_list, sample_size)[0]
     return new_dict
+
+
+def run_experiments(experiment_space, N=100):
+    while N > 0:
+        args_dict = sample_dict(experiment_space, 1)
+        cmd = "python main.py"
+        for k, v in args_dict.items():
+            cmd += " " + str(v)
+        subprocess.run(cmd, shell=True)
+        N -= 1
+        time.sleep(10)
