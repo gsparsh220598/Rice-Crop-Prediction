@@ -68,6 +68,25 @@ As discussed previously, it is possible to use optical and radar data to track t
 	- Then combinations are made which choose 1,...., T of the models to create a final classifier.
 - After this step, the final model is tested on the Holdout set. The best-performing model is used for training on the complete dataset to build the final model.
 # Model Evaluation and Experimentation
+- Each model is tuned using weighted f1 score using nested-cv
+- Each tuned model and ensemble is evaluated using the most difficult to predict `cv_seeds` using cross-validation.
+- Further experimentation is carried out using combinations of models in voting classifier to find the best model.
+- All experiments are tracked and analysed using Weights & Biases.
+# Observations and Learnings
+1. In this project, we learnt the importance of crafting a good cross-validation strategy. Right from the start we could see that using a "Vanilla" CV strategy would not give correlated performance on the submission dataset. For example, in our first few submissions we could see a difference of more than 30% in out of sample performance on the hold-out set compared to the submission set.
+2. By the end of the project, using our final CV strategy, the difference between the performances on the CV and submission sets were about 3-5%. We can safely say that by using this strategy our model is equipped to learn better representations from the data which transfer well to the submission set.
+3. Surprisingly, model performance decreased substantially when optical data (5x5 bbox average) from Sentinel-2 is used with or without Sentinel-1 SAR data. From our significant experiments neither clean (cloud filtered) nor un-clean optical data helped improve performance.
+4. We also experimented with feature engineering using exponential smoothing, peak finding in time-series, principal component analysis, spline transformations etc with limited success. 
+5. Experimentation with different class of models such as gradient boosting classifiers (XGBoost, LGBM), Neural Networks (MLPClassifier) among others did not provide consistent performance improvements and were also less efficient considering NNs. We expected to see some improvements by employing these techniques but they were not to be found. So instead we focused on improving the CV strategy which made the biggest difference for us on model performance.
 # Future Improvements
-# Key Learnings
+1. **Advanced Cloud Correction Techniques**: Implement more sophisticated cloud removal techniques, such as cloud shadow correction and multi-temporal cloud interpolation, to improve the quality of optical data.
 
+2. **Temporal Feature Extraction**: Enhance temporal feature engineering by incorporating techniques like Fourier transforms or wavelet transforms to capture periodic patterns and seasonal variations more effectively.
+
+3. **Multisource Data Fusion**: Develop more advanced methods for fusing optical and SAR data, such as deep learning-based fusion techniques that can capture complementary information from both data sources.
+
+4. **Deep Learning Models**: Explore state-of-the-art deep learning models such as convolutional neural networks (CNNs) for spatial feature extraction and recurrent neural networks (RNNs) or transformers for temporal feature learning.
+
+5. **Geospatial Data Augmentation**: Perform data augmentation on satellite images to increase the diversity and robustness of the training data, such as rotations, translations, and scaling.
+
+6. **Integration of Auxiliary Data**: Incorporate auxiliary data sources such as weather data, soil properties, and topographical data to provide additional context and improve model predictions.
