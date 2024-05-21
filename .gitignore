@@ -1,3 +1,4 @@
 #ignore wandb
 /wandb
 /.env
+/experiment_cache

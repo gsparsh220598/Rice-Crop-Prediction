@@ -1,5 +1,5 @@
-from utils import *
-from hyperparams import *
+from utils import sample_dict, run_experiment, cache
+from hyperparams import experiment_space
 
 N = 20
 if __name__ == "__main__":

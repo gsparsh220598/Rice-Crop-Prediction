@@ -29,6 +29,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.feature_selection import RFECV
 from sklearn.preprocessing import SplineTransformer, LabelEncoder
 from utils import (
+    get_keys_above_threshold,
     score_ensemble,
     proc_pipeline,
     create_col_names,
@@ -216,14 +217,13 @@ make_violinplot(df_, run)
 ###TSNE PLOT###
 tsne_plot(df_, target_column="Target", run=run)
 
-wandb_logs = {}
 ###RANK SEEDS###
 clf = LogisticRegression(max_iter=200, random_state=SEED)
 cv_seeds = rank_seeds(clf, X_train, y_train)
-wandb_logs["cv_seeds"] = cv_seeds
+run.log({"cv_seeds": cv_seeds})
 # seeds2=[1462, 9692, 5749, 1776, 6032, 7865, 4058, 7713, 7119, 1147]
 score = score_clf(clf, X_train, y_train, cv_seeds)
-wandb_logs["cv_score"] = score
+run.log({"cv_score": score})
 
 ###FEATURE IMPORTANCES PLOT###
 model = clf.fit(X_train, y_train)
@@ -237,10 +237,10 @@ res_ridge = run_cvs(
     clf, X_train, y_train, lr_params, splits=5, iters=1, metrics="f1_weighted"
 )
 seeds = find_worst_seeds(res_ridge, topk=args.nseeds)
-wandb_logs["ncv_seeds"] = seeds
+run.log({"ncv_seeds": seeds})
 
 ################MODELING#################
-
+wandb_logs = {}
 # ###MLP CLASSIFIER###
 # clf = MLPClassifier(
 #     hidden_layer_sizes=(16, 8, 4),
@@ -319,6 +319,8 @@ model_xt, xt_score = score_worst_seeds(
     clf, xt_params, X_train, y_train, seeds, iters=args.xt_iters
 )
 wandb_logs["xt_score"] = xt_score
+run.log(wandb_logs)
+model_list = [s.split("_")[0] for s in get_keys_above_threshold(wandb_logs)]
 
 ###ENSEMBLING###
 model_dict = {
@@ -333,6 +335,8 @@ model_dict = {
     "xt": model_xt,
     # "mlp": model_mlp,
 }
-score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, cv_seeds, N=9)
-run.log(wandb_logs)
+model_dict = {m: model_dict[m] for m in model_list}
+score_ensemble(
+    run, model_dict, X_train, y_train, X_test, y_test, cv_seeds, N=len(model_list)
+)
 run.finish()

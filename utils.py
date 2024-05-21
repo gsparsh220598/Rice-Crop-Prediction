@@ -2,6 +2,8 @@ import os
 import pickle
 import subprocess
 import time
+from typing import List
+from scipy import stats
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
@@ -169,7 +171,7 @@ def create_col_names(
     features_sar=["VV", "VH", "RVI", "NDVI_SAR"],
     features_o=["ndvi", "savi", "evi"],
     timesteps=[52, 10],
-):
+) -> dict:
     """
     Create column names for SAR and optical features over specified timesteps.
 
@@ -203,7 +205,7 @@ def create_col_names(
     return dicts
 
 
-def proc_pipeline(s1data, s2data):
+def proc_pipeline(s1data, s2data) -> pd.DataFrame:
     """Preprocesses data for a pipeline.
 
     Args:
@@ -331,7 +333,7 @@ def tsne_plot(dataframe, target_column, run):
     run.log({"tsne_plot": wandb.Plotly(fig)})
 
 
-def rank_seeds(clf, X_train, y_train, topk=10):
+def rank_seeds(clf, X_train, y_train, topk=10) -> List[int]:
     """
     Rank random seeds based on cross-validation accuracy for a given classifier.
 
@@ -364,7 +366,7 @@ def rank_seeds(clf, X_train, y_train, topk=10):
     return seeds
 
 
-def score_clf(clf, X_train, y_train, seeds2):
+def score_clf(clf, X_train, y_train, seeds2) -> int:
     """
     Evaluate a classifier using multiple random seeds for cross-validation.
 
@@ -379,9 +381,7 @@ def score_clf(clf, X_train, y_train, seeds2):
     - seeds2: A list of random seeds to be used for cross-validation.
 
     Returns:
-    - A dictionary containing:
-        - "score": The mean accuracy score across all seeds.
-        - "sd": The standard deviation of the accuracy scores.
+    - t_dist_lower_bound: The lower bound of the t-distribution for the mean accuracy score.
     """
     scores = []
     for seed in seeds2:
@@ -389,8 +389,8 @@ def score_clf(clf, X_train, y_train, seeds2):
         score = cross_val_score(
             clf, X_train, y_train, cv=scv.split(X_train, y_train), scoring="accuracy"
         ).mean()
-        scores.append(score)
-    return np.mean(scores)
+        scores.append(score * 100)
+    return t_dist_lower_bound(scores)
 
 
 def plot_fi(feat_imp, run=None):
@@ -433,7 +433,7 @@ def nested_cv(
     iters=5,
     seed=42,
     metrics="accuracy",
-):
+) -> dict:
     """
     Perform nested cross-validation to evaluate a pipeline with hyperparameter tuning.
 
@@ -479,7 +479,7 @@ def nested_cv(
 
 
 # FUNCTION TO RUN MULTIPLE NESTED CV TRIALS
-def run_cvs(pipe, X, y, grid, splits=10, iters=5, metrics="accuracy"):
+def run_cvs(pipe, X, y, grid, splits=10, iters=5, metrics="accuracy") -> pd.DataFrame:
     """
     Run multiple nested cross-validation trials and store results.
 
@@ -516,7 +516,7 @@ def run_cvs(pipe, X, y, grid, splits=10, iters=5, metrics="accuracy"):
 
 
 # FUNCTION TO FIND THE WORST PERFORMING TRIAL OUT OF ALL THE TRIALS
-def find_worst_seeds(res, topk=5):
+def find_worst_seeds(res, topk=5) -> List[int]:
     """
     Identify the worst performing seeds based on cross-validation results.
 
@@ -544,7 +544,7 @@ def find_worst_seeds(res, topk=5):
 
 
 # MAKING VOTING CLASSIFIER USING A LIST OF MODELS
-def make_vc(search_list, name_list):
+def make_vc(search_list, name_list) -> VotingClassifier:
     """
     Create a voting classifier from a list of models.
 
@@ -665,10 +665,9 @@ def score_worst_seeds(clf, params, X, y, seeds, iters=100):
         model_ls.append(model)
         valid_scores.append(score * 100)
 
-    print(
-        f"The mean accuracy for the {len(seeds)} worst seeds is {np.mean(valid_scores)} and the std. dev. is {np.std(valid_scores)}"
-    )
-    return make_vc(model_ls, seeds), np.mean(valid_scores)
+    fs = t_dist_lower_bound(valid_scores, confidence_level=0.99)
+    print(f"The mean accuracy for the {len(seeds)} worst seeds is {fs}")
+    return make_vc(model_ls, seeds), fs
 
 
 # use itertools to make N>2 combinations of rf, svm, xgb, lgbm, mlp
@@ -703,7 +702,7 @@ def score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, seeds, N=2
         )  # Evaluate and log confusion matrix
 
 
-def sample_dict(original_dict, sample_size):
+def sample_dict(original_dict, sample_size) -> dict:
     """
     Function to sample elements from lists in a dictionary.
 
@@ -719,7 +718,7 @@ def sample_dict(original_dict, sample_size):
     return new_dict
 
 
-def load_cache(filename):
+def load_cache(filename) -> set:
     if os.path.exists(filename):
         with open(filename, "rb") as f:
             return pickle.load(f)
@@ -731,7 +730,7 @@ def save_cache(cache, filename):
         pickle.dump(cache, f)
 
 
-def hashable_dict(d):
+def hashable_dict(d) -> tuple:
     """
     Converts a dictionary into a hashable tuple.
 
@@ -778,4 +777,34 @@ def run_experiment(args_dict):
     for k, v in args_dict.items():
         cmd += " " + str(v)
     subprocess.run(cmd, shell=True)
-    time.sleep(15)
+    time.sleep(30)
+
+
+def t_dist_lower_bound(arr, confidence_level=0.99) -> int:
+    """
+    Calculate the lower bound of a t-distributed random variable.
+
+    Parameters:
+    arr (list or array): The scores of the seeds.
+    confidence_level (float): The desired confidence level. Default is 0.99.
+
+    Returns:
+    float: The lower bound of the t-distributed random variable.
+    """
+    mean, std_dev, sample_size = np.mean(arr), np.std(arr), len(arr)
+    if sample_size == 1:
+        return mean
+    df = sample_size - 1  # Degrees of freedom
+    alpha = 1 - confidence_level
+    t_critical = stats.t.ppf(alpha / 2, df)
+    margin_of_error = t_critical * (std_dev / (sample_size**0.5))
+    lower_bound = mean + margin_of_error
+    return lower_bound
+
+
+def get_keys_above_threshold(d, threshold=95.0):
+    sorted_items = sorted(d.items(), key=lambda item: item[1], reverse=True)
+    keys_above_threshold = [key for key, value in sorted_items if value > threshold]
+    if len(keys_above_threshold) > 4:
+        keys_above_threshold = keys_above_threshold[:4]
+    return keys_above_threshold

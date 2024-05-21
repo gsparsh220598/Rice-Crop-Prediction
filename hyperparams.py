@@ -123,13 +123,13 @@ knn_params = {
 
 experiment_space = {
     "pca": ["yes", "no"],
-    "nfeats": np.linspace(start=10, stop=100, num=20, dtype=np.int16).tolist(),
+    "nfeats": np.linspace(start=40, stop=100, num=20, dtype=np.int16).tolist(),
     "knots": np.linspace(start=5, stop=20, num=10, dtype=np.int16).tolist(),
     "degree": np.linspace(start=2, stop=5, num=5, dtype=np.int16).tolist(),
     "ncomps": np.linspace(start=2, stop=10, num=5, dtype=np.int16).tolist(),
     "kernel": ["linear", "poly", "rbf", "sigmoid", "cosine"],
     "extrap": ["constant", "linear", "continue", "periodic"],
-    "nseeds": np.linspace(start=1, stop=3, num=5, dtype=np.int16).tolist(),
+    "nseeds": np.linspace(start=2, stop=4, num=3, dtype=np.int16).tolist(),
     # "mlp_iters": np.linspace(start=10, stop=100, num=20, dtype=np.int16).tolist(),
     "rf_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
     "xgb_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
