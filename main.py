@@ -239,6 +239,8 @@ res_ridge = run_cvs(
 seeds = find_worst_seeds(res_ridge, topk=args.nseeds)
 wandb_logs["ncv_seeds"] = seeds
 
+################MODELING#################
+
 # ###MLP CLASSIFIER###
 # clf = MLPClassifier(
 #     hidden_layer_sizes=(16, 8, 4),

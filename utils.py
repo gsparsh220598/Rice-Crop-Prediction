@@ -1,4 +1,5 @@
 import os
+import pickle
 import subprocess
 import time
 from tqdm import tqdm
@@ -718,6 +719,18 @@ def sample_dict(original_dict, sample_size):
     return new_dict
 
 
+def load_cache(filename):
+    if os.path.exists(filename):
+        with open(filename, "rb") as f:
+            return pickle.load(f)
+    return set()
+
+
+def save_cache(cache, filename):
+    with open(filename, "wb") as f:
+        pickle.dump(cache, f)
+
+
 def hashable_dict(d):
     """
     Converts a dictionary into a hashable tuple.
@@ -731,7 +744,7 @@ def hashable_dict(d):
     return tuple(sorted(d.items()))
 
 
-def cache(func):
+def cache(func, cache_file="exp_cache.pkl"):
     """
     A decorator that caches the arguments of the function call.
 
@@ -741,7 +754,7 @@ def cache(func):
     Returns:
     function: The wrapped function with caching.
     """
-    cache_set = set()
+    cache_set = load_cache(cache_file)
 
     def cached_func(*args):
         # Convert any dictionary arguments to a hashable type
@@ -752,6 +765,8 @@ def cache(func):
             print(f"Skipping {args} as it is already cached.")
             return
         cache_set.add(hashable_args)
+        save_cache(cache_set, cache_file)
+        print(f"Caching {args}")
         return func(*args)
 
     return cached_func
