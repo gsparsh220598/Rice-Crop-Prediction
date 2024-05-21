@@ -318,21 +318,19 @@ model_xt, xt_score = score_worst_seeds(
 )
 wandb_logs["xt_score"] = xt_score
 
-# ###ENSEMBLING###
-# model_dict = {
-#     "rf": model_rf,
-#     "svm": model_svm,
-#     "xgb": model_xgb,
-#     "lgbm": model_lgbm,
-#     "ada": model_ada,
-#     "knn": model_knn,
-#     "gbm": model_gbm,
-#     "bag": model_bag,
-#     "xt": model_xt,
-#     # "mlp": model_mlp,
-# }
-# score_ensemble(
-#     run, model_dict, X_train, y_train, X_test, y_test, cv_seeds, N=args.Ncombs
-# )
+###ENSEMBLING###
+model_dict = {
+    "rf": model_rf,
+    "svm": model_svm,
+    "xgb": model_xgb,
+    "lgbm": model_lgbm,
+    "ada": model_ada,
+    "knn": model_knn,
+    "gbm": model_gbm,
+    "bag": model_bag,
+    "xt": model_xt,
+    # "mlp": model_mlp,
+}
+score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, cv_seeds, N=9)
 run.log(wandb_logs)
 run.finish()

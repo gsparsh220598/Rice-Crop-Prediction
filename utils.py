@@ -561,7 +561,7 @@ def make_vc(search_list, name_list):
     return VotingClassifier(estimators=estimator_list, voting="soft")
 
 
-def evaluate(clf, combo, X_train, y_train, X_test, y_test, run=None):
+def evaluate(clf, X_train, y_train, X_test, y_test, run=None):
     """
     Evaluate a classifier and log the confusion matrix to Weights & Biases.
 
@@ -587,7 +587,7 @@ def evaluate(clf, combo, X_train, y_train, X_test, y_test, run=None):
     cm = wandb.plot.confusion_matrix(
         y_true=y_test, preds=predictions, class_names=["RICE", "NON-RICE"]
     )
-    run.log({f"confusion_matrix_{combo}": cm})
+    run.log({f"confusion_matrix": cm})
 
 
 def predict_submission(clf, proc_pipe, X, y, use_s2=False):
@@ -689,18 +689,16 @@ def score_ensemble(run, model_dict, X_train, y_train, X_test, y_test, seeds, N=2
     from itertools import combinations
 
     # Generate all combinations of models with length N
-    model_list = list(model_dict.values())
+    model_list = list(model_dict.keys())
     combos = [list(combo) for combo in combinations(model_list, N)]
 
     for combo in combos:
         search_combo = [model_dict[c] for c in combo]
         vclf = make_vc(search_combo, combo)  # Create a voting classifier from the combo
         score = score_clf(vclf, X_train, y_train, seeds)  # Score the voting classifier
-        run.log(
-            {f"score_combo_{'_'.join(combo)}": score}
-        )  # Log the score to Weights & Biases
+        run.log({f"score_ensemble": score})  # Log the score to Weights & Biases
         evaluate(
-            vclf, "_".join(combo), X_train, y_train, X_test, y_test, run
+            vclf, X_train, y_train, X_test, y_test, run
         )  # Evaluate and log confusion matrix
 
 
@@ -720,12 +718,49 @@ def sample_dict(original_dict, sample_size):
     return new_dict
 
 
-def run_experiments(experiment_space, N=100):
-    while N > 0:
-        args_dict = sample_dict(experiment_space, 1)
-        cmd = "python main.py"
-        for k, v in args_dict.items():
-            cmd += " " + str(v)
-        subprocess.run(cmd, shell=True)
-        N -= 1
-        time.sleep(15)
+def hashable_dict(d):
+    """
+    Converts a dictionary into a hashable tuple.
+
+    Parameters:
+    d (dict): The input dictionary.
+
+    Returns:
+    tuple: A hashable representation of the dictionary.
+    """
+    return tuple(sorted(d.items()))
+
+
+def cache(func):
+    """
+    A decorator that caches the arguments of the function call.
+
+    Parameters:
+    func (function): The function to be cached.
+
+    Returns:
+    function: The wrapped function with caching.
+    """
+    cache_set = set()
+
+    def cached_func(*args):
+        # Convert any dictionary arguments to a hashable type
+        hashable_args = tuple(
+            hashable_dict(arg) if isinstance(arg, dict) else arg for arg in args
+        )
+        if hashable_args in cache_set:
+            print(f"Skipping {args} as it is already cached.")
+            return
+        cache_set.add(hashable_args)
+        return func(*args)
+
+    return cached_func
+
+
+def run_experiment(args_dict):
+    # args_dict = sample_dict(experiment_space, 1)
+    cmd = "python main.py"
+    for k, v in args_dict.items():
+        cmd += " " + str(v)
+    subprocess.run(cmd, shell=True)
+    time.sleep(15)
