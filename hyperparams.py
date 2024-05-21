@@ -34,7 +34,7 @@ mlp_params = {
 }
 
 rf_params = {
-    "n_estimators": np.linspace(50, 100, 5, dtype=np.int16),
+    "n_estimators": np.linspace(20, 100, 5, dtype=np.int16),
     "max_depth": np.linspace(2, 15, 10, dtype=np.int16),
     "min_samples_split": np.linspace(2, 20, 10, dtype=np.int16),
     "min_samples_leaf": np.linspace(2, 20, 10, dtype=np.int16),
@@ -43,7 +43,7 @@ rf_params = {
 }
 
 xgb_params = {
-    "n_estimators": np.linspace(50, 100, 10, dtype=np.int16),
+    "n_estimators": np.linspace(20, 100, 10, dtype=np.int16),
     "max_depth": np.linspace(2, 30, 15, dtype=np.int16),
     "max_leaves": np.linspace(2, 10, 6, dtype=np.int16),
     "learning_rate": np.linspace(1e-3, 1.0, 40, dtype=np.float16),
@@ -57,7 +57,7 @@ xgb_params = {
 
 
 lgbm_params = {
-    "n_estimators": np.linspace(50, 100, 10, dtype=np.int16),
+    "n_estimators": np.linspace(20, 100, 10, dtype=np.int16),
     "max_depth": np.linspace(2, 20, 20, dtype=np.int16),
     "num_leaves": np.linspace(2, 10, 6, dtype=np.int16),
     "learning_rate": np.linspace(1e-3, 1.0, 40, dtype=np.float16),
@@ -69,7 +69,7 @@ lgbm_params = {
 }
 
 gbm_params = {
-    "n_estimators": np.linspace(50, 100, 10, dtype=np.int16),
+    "n_estimators": np.linspace(20, 100, 10, dtype=np.int16),
     "max_depth": np.linspace(2, 20, 15, dtype=np.int16),
     "min_samples_split": np.linspace(2, 20, 10, dtype=np.int16),
     "min_samples_leaf": np.linspace(2, 20, 10, dtype=np.int16),
@@ -80,10 +80,10 @@ gbm_params = {
 }
 
 xt_params = {
-    "n_estimators": np.linspace(100, 500, 20, dtype=np.int16),
+    "n_estimators": np.linspace(20, 100, 10, dtype=np.int16),
     "max_depth": np.linspace(2, 20, 15, dtype=np.int16),
-    "min_samples_split": np.linspace(2, 40, 20, dtype=np.int16),
-    "min_samples_leaf": np.linspace(2, 40, 20, dtype=np.int16),
+    "min_samples_split": np.linspace(2, 20, 10, dtype=np.int16),
+    "min_samples_leaf": np.linspace(2, 20, 10, dtype=np.int16),
     "max_leaf_nodes": np.linspace(2, 20, 10, dtype=np.int16),
     "max_features": ["sqrt", "log2", None],
     "criterion": ["gini", "entropy", "log_loss"],
@@ -108,7 +108,7 @@ ada_params = {
         DecisionTreeClassifier(random_state=SEED),
         LogisticRegression(random_state=SEED),
     ],
-    "n_estimators": np.linspace(20, 500, 20, dtype=np.int16),
+    "n_estimators": np.linspace(20, 200, 10, dtype=np.int16),
     "learning_rate": np.linspace(1e-4, 2.0, 20, dtype=np.float16),
 }
 
@@ -129,16 +129,16 @@ experiment_space = {
     "ncomps": np.linspace(start=2, stop=10, num=5, dtype=np.int16).tolist(),
     "kernel": ["linear", "poly", "rbf", "sigmoid", "cosine"],
     "extrap": ["constant", "linear", "continue", "periodic"],
-    "nseeds": np.linspace(start=1, stop=5, num=5, dtype=np.int16).tolist(),
+    "nseeds": np.linspace(start=1, stop=3, num=5, dtype=np.int16).tolist(),
     # "mlp_iters": np.linspace(start=10, stop=100, num=20, dtype=np.int16).tolist(),
-    "rf_iters": np.linspace(start=100, stop=1000, num=20, dtype=np.int16).tolist(),
-    "xgb_iters": np.linspace(start=100, stop=1000, num=20, dtype=np.int16).tolist(),
-    "lgbm_iters": np.linspace(start=100, stop=2000, num=20, dtype=np.int16).tolist(),
-    "svm_iters": np.linspace(start=100, stop=2000, num=20, dtype=np.int16).tolist(),
-    "ada_iters": np.linspace(start=100, stop=1000, num=20, dtype=np.int16).tolist(),
-    "bag_iters": np.linspace(start=100, stop=1000, num=20, dtype=np.int16).tolist(),
-    "knn_iters": np.linspace(start=100, stop=500, num=20, dtype=np.int16).tolist(),
-    "gbm_iters": np.linspace(start=100, stop=2000, num=20, dtype=np.int16).tolist(),
-    "xt_iters": np.linspace(start=100, stop=2000, num=20, dtype=np.int16).tolist(),
+    "rf_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "xgb_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "lgbm_iters": np.linspace(start=100, stop=1000, num=10, dtype=np.int16).tolist(),
+    "svm_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "ada_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "bag_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "knn_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "gbm_iters": np.linspace(start=100, stop=500, num=10, dtype=np.int16).tolist(),
+    "xt_iters": np.linspace(start=100, stop=200, num=10, dtype=np.int16).tolist(),
     "Ncombs": np.linspace(start=2, stop=5, num=3, dtype=np.int16).tolist(),
 }
