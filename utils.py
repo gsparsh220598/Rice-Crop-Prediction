@@ -728,4 +728,4 @@ def run_experiments(experiment_space, N=100):
             cmd += " " + str(v)
         subprocess.run(cmd, shell=True)
         N -= 1
-        time.sleep(10)
+        time.sleep(15)
